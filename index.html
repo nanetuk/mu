@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MU Online Event Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Add global box sizing for responsiveness */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        /* Classic MMORPG UI Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-image: url("mu.png"); /* Fallback */
+            background-color: #0a0a0a; /* Fallback */
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: #fff;
+            user-select: none;
+        }
+
+        /* Container styling matching the MU aesthetic */
+        .mu-window {
+            background-color: rgba(0, 0, 0, 0.85); /* Slightly darker for readability */
+            border: 2px solid #1a110a; 
+            box-shadow: 0 0 0 1px #b89c3a, 0 0 0 2px #3a2b1c, inset 0 0 50px rgba(0,0,0,0.95); /* Deep inset shadow */
+            max-width: 700px;
+            width: 100%;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .mu-header {
+            background: linear-gradient(to bottom, #8b1c1c 0%, #5a0f0f 50%, #3a0505 100%);
+            border-bottom: 2px solid #b89c3a;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.5);
+            padding: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #f0e6d2;
+            text-shadow: 1px 1px 2px #000;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .server-nav {
+            color: #b89c3a;
+            cursor: pointer;
+            padding: 0 15px;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+        .server-nav:hover { 
+            color: #fff;
+            text-shadow: 0 0 8px #b89c3a;
+        }
+
+        .server-title-container {
+            flex-grow: 1;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 10px;
+        }
+        .server-title-container:hover #server-name-display {
+            text-decoration: underline;
+            text-decoration-color: #b89c3a;
+        }
+        
+        #server-rename-input {
+            background: #000;
+            border: 1px solid #b89c3a;
+            color: #fff;
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 2px 5px;
+            width: 150px;
+            outline: none;
+            display: none;
+        }
+
+        .mu-current-time {
+            text-align: center;
+            font-size: 1.25rem;
+            color: #b89c3a;
+            font-weight: bold;
+            padding: 8px;
+            border-bottom: 2px solid #3a2b1c;
+            background: rgba(0,0,0,0.6);
+            letter-spacing: 2px;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .mu-content {
+            padding: 15px;
+            min-height: 250px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        /* Event Row Flexbox Layout */
+        .mu-event-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 12px 8px;
+            border-bottom: 1px dashed rgba(184, 156, 58, 0.3);
+            transition: background-color 0.2s;
+        }
+
+        .mu-event-row:last-child { border-bottom: none; }
+        .mu-event-row:hover { background-color: rgba(255,255,255,0.05); }
+
+        .mu-event-info {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .mu-event-name {
+            color: #a0b0d0; /* Requested MU light blue */
+            text-shadow: 1px 1px 1px #000;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mu-event-meta {
+            color: #9a8a70;
+            font-size: 0.8rem;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mu-event-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+
+        .mu-event-time {
+            color: #ffffff;
+            text-shadow: 1px 1px 1px #000;
+            font-size: 1.2rem;
+            font-weight: normal;
+            text-align: right;
+            min-width: 90px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mu-event-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .action-btn {
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-shadow: 1px 1px 0 #000;
+            transition: transform 0.1s;
+        }
+        .action-btn:active { transform: scale(0.9); }
+        .edit-btn { color: #b89c3a; }
+        .edit-btn:hover { color: #f0d48a; }
+        .delete-btn { color: #ff4444; }
+        .delete-btn:hover { color: #ff7777; }
+
+        /* Forms & Inputs */
+        .admin-panel {
+            background-color: rgba(10, 10, 10, 0.95);
+            border: 1px solid #3a2b1c;
+            border-top: 2px solid #b89c3a;
+        }
+        .mu-input {
+            background: #050505;
+            border: 1px solid #5a3c20;
+            color: #fff;
+            padding: 8px 10px;
+            width: 100%;
+            font-family: Arial, sans-serif;
+            outline: none;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        .mu-input:focus { border-color: #b89c3a; }
+        
+        .mu-btn {
+            background: linear-gradient(to bottom, #4a4a4a, #2a2a2a);
+            border: 1px solid #111;
+            box-shadow: inset 0 0 0 1px #5a5a5a;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+            text-shadow: 1px 1px 0 #000;
+            font-size: 0.95rem;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .mu-btn:hover { background: linear-gradient(to bottom, #5a5a5a, #3a3a3a); }
+        .mu-btn:active { box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); }
+
+        /* Toasts & Overlays */
+        #toast-container {
+            position: fixed; top: 15%; left: 50%; transform: translateX(-50%);
+            z-index: 50; pointer-events: none; display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .mu-system-msg {
+            color: #ffcc00;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 2px 4px rgba(0,0,0,0.8);
+            font-weight: bold; font-size: 1.15rem; text-align: center;
+            background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 4px;
+            opacity: 0; transform: translateY(-20px); transition: all 0.4s ease;
+        }
+        .mu-system-msg.show { opacity: 1; transform: translateY(0); }
+
+        #alarm-overlay {
+            position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; background: linear-gradient(to bottom, #8b0000, #400000);
+            border: 2px solid #ff4444; color: white; padding: 20px 40px;
+            font-weight: bold; font-size: 1.3rem; cursor: pointer;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.8), inset 0 0 10px rgba(0,0,0,0.8);
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center; border-radius: 4px; display: flex; flex-direction: column;
+            width: 90%; max-width: 450px;
+        }
+        #alarm-overlay.active { top: 20px; }
+        .blink-text { animation: blink 1s infinite; color: #ffcc00; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse-alert {
+            0% { background-color: rgba(139, 0, 0, 0.1); }
+            50% { background-color: rgba(139, 0, 0, 0.7); box-shadow: inset 0 0 20px rgba(255,0,0,0.6); }
+            100% { background-color: rgba(139, 0, 0, 0.1); }
+        }
+        .flash-row { animation: pulse-alert 1.2s infinite; cursor: pointer; }
+
+        @media (max-width: 500px) {
+            .mu-event-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .mu-event-info { width: 100%; }
+            .mu-event-right { width: 100%; justify-content: space-between; margin-top: 4px; }
+            .mu-header { font-size: 14px; }
+            #alarm-overlay { padding: 15px; font-size: 1.1rem; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111; border-left: 1px solid #3a2b1c; }
+        ::-webkit-scrollbar-thumb { background: #5a3c20; border: 1px solid #1a110a; }
+        ::-webkit-scrollbar-thumb:hover { background: #b89c3a; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 pt-10" onclick="initAudio()">
+
+    <!-- Active Alarm Banner -->
+    <div id="alarm-overlay" onclick="stopAlarm()">
+        <span class="blink-text mb-1">⚠️ ALARM ACTIVE ⚠️</span>
+        <span id="alarm-msg" class="text-base font-normal mb-2"></span>
+        <span class="text-sm text-gray-300">Click anywhere here to STOP</span>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <!-- Main Window -->
+    <div class="mu-window mb-6">
+        <div class="mu-header">
+            <span class="server-nav" onclick="changeServer(-1)">◄</span>
+            <div class="server-title-container" onclick="openRenameInput()">
+                <span id="server-name-display" title="Click to rename server">Server Name</span>
+                <input type="text" id="server-rename-input" onblur="saveServerName()" onkeydown="handleRenameKey(event)" maxlength="20">
+            </div>
+            <span class="server-nav" onclick="changeServer(1)">►</span>
+        </div>
+        <div id="clock" class="mu-current-time">00:00:00</div>
+        
+        <div class="mu-content" id="event-list" onclick="handleListClick(event)">
+            <!-- Events list -->
+        </div>
+    </div>
+
+    <div class="text-center mb-6">
+        <button onclick="toggleConfig()" class="mu-btn" style="border-color: #b89c3a; color: #b89c3a; padding: 12px 24px;">⚙️ Configuration</button>
+    </div>
+
+    <!-- Config Panel -->
+    <div id="admin-panel" class="hidden max-w-4xl w-full mx-auto admin-panel p-6 shadow-2xl">
+        <h2 class="text-2xl text-[#b89c3a] font-bold mb-6 border-b border-[#5a3c20] pb-2">Event Management</h2>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            <!-- Event Form -->
+            <div>
+                <h3 class="text-[#a0b0d0] mb-4 font-bold text-sm uppercase tracking-wider">Add / Edit Event</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Event Name</label>
+                        <input type="text" id="ev-name" class="mu-input" placeholder="Devil Square">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Location</label>
+                        <input type="text" id="ev-loc" class="mu-input" placeholder="Noria">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Target Time (Your Local Time)</label>
+                        <input type="datetime-local" id="ev-time" class="mu-input">
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-400 mb-1">Repeat Interval (Mins)</label>
+                            <input type="number" id="ev-repeat" class="mu-input" value="0" min="0">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-400 mb-1">Alerts (CSV Mins)</label>
+                            <input type="text" id="ev-alerts" class="mu-input" placeholder="5, 10" value="5, 10">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Custom Sound URL (Optional)</label>
+                        <input type="text" id="ev-sound" class="mu-input" placeholder="https://example.com/sound.mp3">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-2">
+                        <button id="btn-save" onclick="saveEvent()" class="mu-btn flex-1 text-green-400">Add Event</button>
+                        <button id="btn-cancel" onclick="cancelEdit()" class="mu-btn hidden flex-none px-6" style="background: #5a0f0f; color: #ff7777;">Cancel</button>
+                        <button onclick="testAlarm()" class="mu-btn flex-none px-6">🔊 Test</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Config & Storage Column -->
+            <div class="flex flex-col gap-8">
+                
+                <!-- Global Settings -->
+                <div>
+                    <h3 class="text-[#a0b0d0] mb-4 font-bold text-sm uppercase tracking-wider">Global Settings</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Background Image URL (Auto-saves on blur)</label>
+                            <input type="text" id="global-bg" class="mu-input" placeholder="mu.png" onblur="saveGlobalSettings()">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Default Alarm Sound URL (Fallback)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="global-sound" class="mu-input flex-grow" placeholder="https://example.com/default.mp3" onblur="saveGlobalSettings()">
+                                <button onclick="testGlobalAlarm()" class="mu-btn flex-none px-4" title="Test Global Alarm">🔊</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import / Export strict schema -->
+                <div class="flex flex-col flex-grow">
+                    <h3 class="text-[#a0b0d0] mb-4 font-bold text-sm uppercase tracking-wider">Storage & JSON</h3>
+                    <p class="text-xs text-gray-400 mb-3 leading-relaxed">
+                        Data uses absolute UTC time. Timers synchronize across all timezones automatically. 
+                        <br><strong class="text-red-400">Strict Schema:</strong> <code>{ "servers": {}, "events": [], "settings": {} }</code>
+                    </p>
+                    <textarea id="json-data" class="mu-input flex-grow mb-4 resize-none font-mono text-xs p-3" placeholder="Paste strict JSON schema here..."></textarea>
+                    <div class="flex gap-3">
+                        <button onclick="exportData()" class="mu-btn flex-1 text-[#b89c3a]">Export JSON</button>
+                        <button onclick="importData()" class="mu-btn flex-1 text-[#a0b0d0]">Import JSON</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Strict State Architecture ---
+        let appState = {
+            servers: {},
+            events: [],
+            settings: { bgUrl: 'mu.png', defaultSound: '' }
+        };
+        
+        let currentServerIndex = 0; // 0 through 9
+        let editingId = null;
+        
+        // Audio State
+        let audioCtx = null;
+        let activeAudio = null;
+        let beepInterval = null;
+        let autoStopTimeout = null;
+
+        // Initialize empty servers mapping
+        for (let i = 0; i < 10; i++) {
+            appState.servers[i] = `Server ${i + 1}`;
+        }
+
+        window.onload = () => {
+            loadState();
+            applySettings();
+            setCurrentTimeInput();
+            setInterval(gameLoop, 1000);
+            updateUI();
+        };
+
+        // --- Core UI & Navigation ---
+        function toggleConfig() {
+            document.getElementById('admin-panel').classList.toggle('hidden');
+        }
+
+        function changeServer(dir) {
+            currentServerIndex += dir;
+            if (currentServerIndex > 9) currentServerIndex = 0;
+            if (currentServerIndex < 0) currentServerIndex = 9;
+            updateUI();
+        }
+
+        function updateUI() {
+            const sName = appState.servers[currentServerIndex] || `Server ${currentServerIndex + 1}`;
+            document.getElementById('server-name-display').textContent = sName;
+            document.getElementById('server-name-display').style.display = 'inline';
+            document.getElementById('server-rename-input').style.display = 'none';
+            renderList();
+        }
+
+        // --- Server Renaming (Inline) ---
+        function openRenameInput() {
+            const display = document.getElementById('server-name-display');
+            const input = document.getElementById('server-rename-input');
+            input.value = display.textContent;
+            display.style.display = 'none';
+            input.style.display = 'inline-block';
+            input.focus();
+            input.select();
+        }
+
+        function handleRenameKey(e) {
+            if (e.key === 'Enter') saveServerName();
+            if (e.key === 'Escape') updateUI();
+        }
+
+        function saveServerName() {
+            const input = document.getElementById('server-rename-input');
+            const newName = input.value.trim();
+            if (newName) {
+                appState.servers[currentServerIndex] = newName;
+                persistState();
+            }
+            updateUI();
+        }
+
+        // --- Global Settings ---
+        function applySettings() {
+            if (appState.settings && appState.settings.bgUrl) {
+                document.body.style.backgroundImage = `url('${appState.settings.bgUrl}')`;
+            } else {
+                document.body.style.backgroundImage = 'mu.png';
+            }
+            
+            document.getElementById('global-bg').value = (appState.settings && appState.settings.bgUrl) ? appState.settings.bgUrl : '';
+            document.getElementById('global-sound').value = (appState.settings && appState.settings.defaultSound) ? appState.settings.defaultSound : '';
+        }
+
+        function saveGlobalSettings() {
+            if (!appState.settings) appState.settings = {};
+            appState.settings.bgUrl = document.getElementById('global-bg').value.trim();
+            appState.settings.defaultSound = document.getElementById('global-sound').value.trim();
+            persistState();
+            applySettings();
+            toast("Global settings saved");
+        }
+
+        // --- Form Handling ---
+        function setCurrentTimeInput() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('ev-time').value = now.toISOString().slice(0,16);
+        }
+
+        function saveEvent() {
+            const name = document.getElementById('ev-name').value.trim();
+            const loc = document.getElementById('ev-loc').value.trim();
+            const timeStr = document.getElementById('ev-time').value;
+            const repeatStr = document.getElementById('ev-repeat').value;
+            const alertsStr = document.getElementById('ev-alerts').value;
+            const soundUrl = document.getElementById('ev-sound').value.trim();
+
+            if (!name || !timeStr) return toast("Name and Time are required!");
+
+            const targetTimeUTC = new Date(timeStr).getTime();
+            const repeatInterval = parseInt(repeatStr) || 0;
+            const alerts = alertsStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0).sort((a,b)=>b-a);
+
+            if (editingId) {
+                const ev = appState.events.find(e => e.id === editingId);
+                if (ev) {
+                    ev.name = name; ev.location = loc; ev.targetTimeUTC = targetTimeUTC;
+                    ev.repeatInterval = repeatInterval; ev.alerts = alerts; ev.customSoundUrl = soundUrl;
+                    ev.alerted = {}; ev.isFlashing = false;
+                }
+                toast(`Updated: ${name}`);
+                cancelEdit();
+            } else {
+                appState.events.push({
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+                    serverId: currentServerIndex,
+                    name, location: loc, targetTimeUTC, repeatInterval, alerts,
+                    customSoundUrl: soundUrl, alerted: {}, isFlashing: false
+                });
+                toast(`Added to ${appState.servers[currentServerIndex]}: ${name}`);
+                document.getElementById('ev-name').value = '';
+                document.getElementById('ev-loc').value = '';
+            }
+            persistState();
+            renderList();
+        }
+
+        function editEvent(id) {
+            const ev = appState.events.find(e => e.id === id);
+            if (!ev) return;
+            
+            editingId = id;
+            document.getElementById('ev-name').value = ev.name;
+            document.getElementById('ev-loc').value = ev.location;
+            document.getElementById('ev-repeat').value = ev.repeatInterval;
+            document.getElementById('ev-alerts').value = ev.alerts.join(', ');
+            document.getElementById('ev-sound').value = ev.customSoundUrl || '';
+            
+            const local = new Date(ev.targetTimeUTC);
+            local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
+            document.getElementById('ev-time').value = local.toISOString().slice(0,16);
+
+            document.getElementById('btn-save').textContent = 'Update Event';
+            document.getElementById('btn-save').className = 'mu-btn flex-1 text-[#b89c3a]';
+            document.getElementById('btn-cancel').classList.remove('hidden');
+            
+            document.getElementById('admin-panel').classList.remove('hidden');
+            document.getElementById('admin-panel').scrollIntoView({behavior: 'smooth'});
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            document.getElementById('btn-save').textContent = 'Add Event';
+            document.getElementById('btn-save').className = 'mu-btn flex-1 text-green-400';
+            document.getElementById('btn-cancel').classList.add('hidden');
+            
+            document.getElementById('ev-name').value = '';
+            document.getElementById('ev-loc').value = '';
+            document.getElementById('ev-repeat').value = '0';
+            document.getElementById('ev-alerts').value = '5, 10';
+            document.getElementById('ev-sound').value = '';
+            setCurrentTimeInput();
+        }
+
+        // --- Main Game Loop & Rendering ---
+        function gameLoop() {
+            const now = Date.now();
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+            let needRender = false;
+
+            appState.events.forEach(ev => {
+                let remaining = ev.targetTimeUTC - now;
+
+                // Auto Repeat
+                if (remaining <= 0 && ev.repeatInterval > 0) {
+                    const intMs = ev.repeatInterval * 60000;
+                    while (ev.targetTimeUTC <= now) {
+                        ev.targetTimeUTC += intMs;
+                    }
+                    ev.alerted = {};
+                    ev.isFlashing = false;
+                    remaining = ev.targetTimeUTC - now;
+                    if (ev.serverId === currentServerIndex) needRender = true;
+                    persistState();
+                }
+
+                // Alerts
+                if (remaining > 0) {
+                    ev.alerts.forEach(min => {
+                        const threshold = min * 60000;
+                        if (remaining <= threshold && !ev.alerted[min]) {
+                            ev.alerted[min] = true;
+                            ev.isFlashing = true;
+                            
+                            const sName = appState.servers[ev.serverId] || `Server ${ev.serverId+1}`;
+                            const soundToPlay = ev.customSoundUrl || (appState.settings && appState.settings.defaultSound ? appState.settings.defaultSound : '');
+                            triggerAlarm(`[${sName}] ${ev.name} starts in ${min} min!`, soundToPlay);
+                            
+                            if (ev.serverId === currentServerIndex) needRender = true;
+                            persistState();
+                        }
+                    });
+                }
+            });
+
+            // Re-render list to update timers
+            renderList(); 
+        }
+
+        function renderList() {
+            const container = document.getElementById('event-list');
+            const sEvents = appState.events.filter(e => e.serverId === currentServerIndex);
+            
+            if (sEvents.length === 0) {
+                container.innerHTML = `<div class="text-center text-[#9a8a70] mt-8 text-sm">No events scheduled.</div>`;
+                return;
+            }
+
+            sEvents.sort((a, b) => a.targetTimeUTC - b.targetTimeUTC);
+            const now = Date.now();
+            let html = '';
+
+            sEvents.forEach(ev => {
+                const rem = ev.targetTimeUTC - now;
+                const timeStr = rem <= 0 ? '<span style="color:#9a8a70">Ended</span>' : formatT(rem);
+                
+                let meta = [];
+                if (ev.location) meta.push(`Loc: ${ev.location}`);
+                if (ev.alerts.length) meta.push(`Alerts: ${ev.alerts.join(',')}m`);
+                if (ev.repeatInterval) meta.push(`Repeat: ${ev.repeatInterval}m`);
+                if (ev.customSoundUrl) meta.push(`🎵`);
+
+                const flash = ev.isFlashing ? 'flash-row' : '';
+
+                html += `
+                    <div class="mu-event-row ${flash}" data-id="${ev.id}">
+                        <div class="mu-event-info">
+                            <div class="mu-event-name">${escapeHTML(ev.name)}</div>
+                            <div class="mu-event-meta">${escapeHTML(meta.join(' | ') || 'No settings')}</div>
+                        </div>
+                        <div class="mu-event-right">
+                            <div class="mu-event-time">${timeStr}</div>
+                            <div class="mu-event-actions">
+                                <span class="action-btn edit-btn" data-action="edit">E</span>
+                                <span class="action-btn delete-btn" data-action="del">X</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function formatT(ms) {
+            const s = Math.floor(ms / 1000);
+            const pad = n => n.toString().padStart(2, '0');
+            const d = Math.floor(s / 86400);
+            const h = Math.floor((s % 86400) / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return d > 0 ? `${pad(d)}:${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(h)}:${pad(m)}:${pad(sec)}`;
+        }
+
+        function handleListClick(e) {
+            const row = e.target.closest('.mu-event-row');
+            if (!row) return;
+            const id = row.dataset.id;
+            
+            if (e.target.dataset.action === 'del') {
+                appState.events = appState.events.filter(x => x.id !== id);
+                if (editingId === id) cancelEdit();
+                persistState();
+                renderList();
+            } else if (e.target.dataset.action === 'edit') {
+                editEvent(id);
+            } else if (row.classList.contains('flash-row')) {
+                // Acknowledge flash
+                const ev = appState.events.find(x => x.id === id);
+                if (ev) {
+                    ev.isFlashing = false;
+                    persistState();
+                    renderList();
+                }
+            }
+        }
+
+        // --- Audio System ---
+        function initAudio() {
+            if (!audioCtx) {
+                const ACtx = window.AudioContext || window.webkitAudioContext;
+                if (ACtx) audioCtx = new ACtx();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function synthChime() {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            const playN = (f, t) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = f;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.5, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(t); osc.stop(t + 0.6);
+            };
+            playN(880, now); playN(1108.73, now + 0.15);
+        }
+
+        function triggerAlarm(msg, url) {
+            initAudio();
+            stopAlarm();
+            
+            document.getElementById('alarm-msg').textContent = msg;
+            document.getElementById('alarm-overlay').classList.add('active');
+
+            if (url) {
+                activeAudio = new Audio(url);
+                activeAudio.loop = true;
+                activeAudio.play().catch(e => {
+                    console.warn("Audio block, fallback used.", e);
+                    activeAudio = null;
+                    startFallback();
+                });
+            } else {
+                startFallback();
+            }
+
+            // Enforce 5 minute maximum runtime
+            autoStopTimeout = setTimeout(stopAlarm, 300000);
+        }
+
+        function startFallback() {
+            synthChime();
+            beepInterval = setInterval(synthChime, 2000);
+        }
+
+        function stopAlarm() {
+            clearTimeout(autoStopTimeout);
+            clearInterval(beepInterval);
+            if (activeAudio) {
+                activeAudio.pause();
+                activeAudio.currentTime = 0;
+                activeAudio = null;
+            }
+            document.getElementById('alarm-overlay').classList.remove('active');
+        }
+
+        function testGlobalAlarm() {
+            const url = document.getElementById('global-sound').value.trim();
+            triggerAlarm("Test Global Alarm (Auto-stops in 5m)", url);
+        }
+
+        function testAlarm() {
+            const evUrl = document.getElementById('ev-sound').value.trim();
+            const url = evUrl || (appState.settings && appState.settings.defaultSound ? appState.settings.defaultSound : '');
+            triggerAlarm("Test Event Alarm (Auto-stops in 5m)", url);
+        }
+
+        // --- Storage & Strict JSON ---
+        function persistState() {
+            localStorage.setItem('mu_state_strict', JSON.stringify(appState));
+        }
+
+        function loadState() {
+            const s = localStorage.getItem('mu_state_strict');
+            if (s) {
+                try {
+                    const parsed = JSON.parse(s);
+                    if (parsed.servers && parsed.events) {
+                        appState = parsed;
+                        if (!appState.settings) appState.settings = { bgUrl: 'image_e4499f.jpg', defaultSound: '' };
+                    }
+                } catch(e) { console.error("Load fail", e); }
+            }
+        }
+
+        function exportData() {
+            const text = JSON.stringify(appState, null, 2);
+            const area = document.getElementById('json-data');
+            area.value = text;
+            area.select();
+            try { 
+                document.execCommand('copy'); 
+                toast("Exported & Copied to clipboard"); 
+            } catch(e) { toast("Exported. Copy manually."); }
+        }
+
+        function importData() {
+            const text = document.getElementById('json-data').value.trim();
+            if (!text) return toast("Paste JSON first");
+            
+            try {
+                const parsed = JSON.parse(text);
+                // Strict validation
+                if (!parsed.servers || typeof parsed.servers !== 'object' || !Array.isArray(parsed.events)) {
+                    throw new Error("Invalid strict schema");
+                }
+                
+                appState = parsed;
+                persistState();
+                applySettings();
+                currentServerIndex = 0;
+                updateUI();
+                document.getElementById('json-data').value = '';
+                toast("Import Successful");
+            } catch(e) {
+                toast("Import Failed: Must match strict schema!");
+                console.error(e);
+            }
+        }
+
+        function toast(msg) {
+            const c = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'mu-system-msg';
+            el.textContent = msg;
+            c.appendChild(el);
+            setTimeout(() => el.classList.add('show'), 10);
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 400);
+            }, 4000);
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.toString().replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
+        }
+    </script>
+</body>
+</html>
